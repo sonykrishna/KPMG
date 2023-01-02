@@ -1,7 +1,4 @@
-variable "version"{
-    type=string
-    default="3.5.0"
-}
+
 variable "project_id" {
   description = "The ID of the project where this VPC will be created"
   default = "stalwart-space-322314"
