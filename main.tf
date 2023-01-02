@@ -1,5 +1,4 @@
-provider "google" {
-version = "3.5.0"
+provider "google"{
 project = var.project_id
 region = var.default_region
 zone = var.default_zone
