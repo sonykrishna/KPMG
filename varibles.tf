@@ -1,86 +1,76 @@
+provider "google"{
+project = var.project_id
+region = var.default_region
+zone = var.default_zone
+}
+/* vpc module */
+resource "google_compute_network" "vpc_network" {
+  name                            = var.network_name
+  routing_mode                    = var.routing_mode
+  project                         = var.project_id
+  auto_create_subnetworks         = false
+}
+/*subnet module */
+resource "google_compute_subnetwork" "public_subnetwork" {
+    name = var.subnet_name
+    ip_cidr_range = var.ip_range
+    region = var.default_region
+    network = google_compute_network.vpc_network.name
+    private_ip_google_access = true
+}
+/* compute instance  module*/
+resource "google_compute_instance" "compute_instance" {
+  name=var.compute_name
+  machine_type=var.machine_type
+  zone=var.default_zone
+  boot_disk {
+    initialize_params {
+      image = var.boot_image
+    }
+  }
+  network_interface {
+    network = google_compute_network.vpc_network.name
+    subnetwork = google_compute_subnetwork.public_subnetwork.name
+    access_config {
+    }
+  }
+   service_account {
+    email=var.sa_email
+    scopes=["cloud-platform"]
+  }
+  tags=[var.network_tags]
+}
+/* firewall module */
+resource "google_compute_firewall" "firewall_rule" {
+  name    = var.firewall_name
+source_ranges=["0.0.0.0/0"]
+source_tags=null
+source_service_accounts=null
+  network = google_compute_network.vpc_network.name
+  allow {
+    protocol = "icmp"
+  }
 
-variable "project_id" {
-  description = "The ID of the project where this VPC will be created"
-  default = "stalwart-space-322314"
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443","22"]
+  }
+
+  target_tags = [var.network_tags]
 }
-variable "default_region" {
-  default = "us-central1"
+/*sql instance */
+resource "google_sql_database_instance" "instance" {
+  name             = var.mysql_name
+  region           = var.default_region
+  database_version = var.mysql_version
+  settings {
+    tier = var.mysql_tier
+  }
+deletion_protection = false
 }
-variable "default_zone" {
-  default = "us-central1-a"
-}
-variable "network_name" {
-  description = "The name of the network being created"
-  default="terraform-vpc"
-}
-variable "routing_mode" {
-  type        = string
-  default     = "REGIONAL"
-  description = "The network routing mode (default 'GLOBAL')"
-}
-variable "subnet_name" {
-  type        = string
-  default     = "terraform-subnet"
-}
-variable "ip_range"{
-    type=string
-    default="10.0.0.0/24"
-}
-variable "compute_name" {
-  type        = string
-  default     = "terraform-vm"
-}
-variable "machine_type"{
-    type=string
-    default="e2-medium"
-}
-variable "sql_name" {
-  type="string"
-default = "terraform-sql"
-}
-variable "database_version" {
-  type="string"
-  default = "MYSQL_8_0"
-}
-variable "tier_settings" {
-  type="string"
-  default = "db-n1-standard-2"
-}
-variable "tags" {
-  type="[string]"
-  default = ["https-server","http-server"]
-  
-}
-variable "image" {
-  type = "string"
-  default = "debian-cloud/debian-11"
-  
-}
-variable "sql_database"{
- type = "string"
-  default = "terraform-test"
-}
-variable "charset"{
- type = "string"
-  default = "utf8"
-}
-variable "collation"{
- type = "string"
-  default = "utf8-general-cli"
-}
-variable "users"{
- type = "string"
-  default = "krishna"
-}
-variable "host"{
- type = "string"
-  default = "%"
-}
-variable "password"{
- type = "string"
-  default = "krishnaprasanna"
-}
-variable "ip_v4" {
-  type="string"
-  default = "ipv4-address"
+/* sql data user */
+resource "google_sql_user" "users" {
+  name     = "user"
+  instance = google_sql_database_instance.instance.name
+  password = "root"
 }

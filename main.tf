@@ -3,12 +3,14 @@ project = var.project_id
 region = var.default_region
 zone = var.default_zone
 }
+/* vpc module */
 resource "google_compute_network" "vpc_network" {
   name                            = var.network_name
   routing_mode                    = var.routing_mode
   project                         = var.project_id
   auto_create_subnetworks         = false
 }
+/*subnet module */
 resource "google_compute_subnetwork" "public_subnetwork" {
     name = var.subnet_name
     ip_cidr_range = var.ip_range
@@ -16,16 +18,11 @@ resource "google_compute_subnetwork" "public_subnetwork" {
     network = google_compute_network.vpc_network.name
     private_ip_google_access = true
 }
-
-
-resource "google_compute_address" "static" {
-  name = var.ip_v4
-}
+/* compute instance  module*/
 resource "google_compute_instance" "compute_instance" {
   name=var.compute_name
   machine_type=var.machine_type
   zone=var.default_zone
-  region=var.default_region
   boot_disk {
     initialize_params {
       image = var.boot_image
@@ -33,38 +30,47 @@ resource "google_compute_instance" "compute_instance" {
   }
   network_interface {
     network = google_compute_network.vpc_network.name
+    subnetwork = google_compute_subnetwork.public_subnetwork.name
     access_config {
-      nat_ip = google_compute_address.static.address
     }
   }
-  tags = var.tags
+   service_account {
+    email=var.sa_email
+    scopes=["cloud-platform"]
+  }
+  tags=[var.network_tags]
 }
-resource "google_sql_database_instance" "sql_database" {
-  name = var.sql_name
-database_version =var.sql_version
-region = var.default_region
-settings {
-tier = var.tier_settings
-ip_configuration {
+/* firewall module */
+resource "google_compute_firewall" "firewall_rule" {
+  name    = var.firewall_name
+source_ranges=["0.0.0.0/0"]
+source_tags=null
+source_service_accounts=null
+  network = google_compute_network.vpc_network.name
+  allow {
+    protocol = "icmp"
+  }
 
-      dynamic "authorized_networks" {
-        content {
-          name  = var.sql_add_network
-         // value =google_compute_instance.compute_instance.network_interface.access_config.nat_ip
-        }
-      }
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443","22"]
+  }
+
+  target_tags = [var.network_tags]
 }
+/*sql instance */
+resource "google_sql_database_instance" "instance" {
+  name             = var.mysql_name
+  region           = var.default_region
+  database_version = var.mysql_version
+  settings {
+    tier = var.mysql_tier
+  }
+deletion_protection = false
 }
-}
-resource "google_sql_database" "sql_database" {
-name = var.sql_database
-instance = google_sql_database_instance.sql_database.name
-charset = var.charset
-collation = var.collation
-}
+/* sql data user */
 resource "google_sql_user" "users" {
-name = var.sql_user
-instance =google_sql_database_instance.sql_database.name
-host = var.host
-password = var.password
+  name     = "user"
+  instance = google_sql_database_instance.instance.name
+  password = "root"
 }
