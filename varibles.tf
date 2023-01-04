@@ -1,76 +1,72 @@
-provider "google"{
-project = var.project_id
-region = var.default_region
-zone = var.default_zone
+/* provider block variables */
+variable "project_id" {
+  description = "The ID of the project where this VPC will be created"
+  default = "stalwart-space-322314"
 }
-/* vpc module */
-resource "google_compute_network" "vpc_network" {
-  name                            = var.network_name
-  routing_mode                    = var.routing_mode
-  project                         = var.project_id
-  auto_create_subnetworks         = false
+variable "default_region" {
+  default = "us-central1"
 }
-/*subnet module */
-resource "google_compute_subnetwork" "public_subnetwork" {
-    name = var.subnet_name
-    ip_cidr_range = var.ip_range
-    region = var.default_region
-    network = google_compute_network.vpc_network.name
-    private_ip_google_access = true
+variable "default_zone" {
+  default = "us-central1-a"
 }
-/* compute instance  module*/
-resource "google_compute_instance" "compute_instance" {
-  name=var.compute_name
-  machine_type=var.machine_type
-  zone=var.default_zone
-  boot_disk {
-    initialize_params {
-      image = var.boot_image
-    }
-  }
-  network_interface {
-    network = google_compute_network.vpc_network.name
-    subnetwork = google_compute_subnetwork.public_subnetwork.name
-    access_config {
-    }
-  }
-   service_account {
-    email=var.sa_email
-    scopes=["cloud-platform"]
-  }
-  tags=[var.network_tags]
-}
-/* firewall module */
-resource "google_compute_firewall" "firewall_rule" {
-  name    = var.firewall_name
-source_ranges=["0.0.0.0/0"]
-source_tags=null
-source_service_accounts=null
-  network = google_compute_network.vpc_network.name
-  allow {
-    protocol = "icmp"
-  }
 
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "443","22"]
-  }
+/* vpc block variables */
+variable "network_name" {
+  description = "The name of the network being created"
+  default="terraform-vpc"
+}
+variable "routing_mode" {
+  type        = string
+  default     = "REGIONAL"
+  description = "The network routing mode (default 'GLOBAL')"
+}
+/*subnet variables */
+variable "subnet_name" {
+  type        = string
+  default     = "terraform-subnet"
+}
+variable "ip_range"{
+    type=string
+    default="10.0.0.0/24"
+}
+/* vm variables */
+/* vm variables */
+variable "compute_name" {
+  type        = string
+  default     = "terraform-vm"
+}
+variable "machine_type"{
+    type=string
+    default="e2-medium"
+}
 
-  target_tags = [var.network_tags]
+variable "boot_image"{
+type=string
+default="debian-cloud/debian-11"
 }
-/*sql instance */
-resource "google_sql_database_instance" "instance" {
-  name             = var.mysql_name
-  region           = var.default_region
-  database_version = var.mysql_version
-  settings {
-    tier = var.mysql_tier
-  }
-deletion_protection = false
+variable "network_tags"{
+  type=string
+ default="allow-traffic"
 }
-/* sql data user */
-resource "google_sql_user" "users" {
-  name     = "user"
-  instance = google_sql_database_instance.instance.name
-  password = "root"
+variable "sa_email"{
+  
+default="748468258750-compute@developer.gserviceaccount.com"
+}
+/* firewall variables */
+variable "firewall_name"{
+  type=string
+ default="terraform-firewall"
+}
+/* sql database variables */
+variable "mysql_name"{
+  type=string
+ default="terraform-sql"
+}
+variable "mysql_version"{
+  type=string
+ default="MYSQL_8_0"
+}
+variable "mysql_tier"{
+  type=string
+ default="db-f1-micro"
 }
